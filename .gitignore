@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+logs/*.log
+
+# Temp output files (keep structure, ignore generated data)
+output/temp/
+output/*.csv
+output/*.xlsx
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Keep output and data directories
+!output/.gitkeep
+!logs/.gitkeep
+!data/.gitkeep

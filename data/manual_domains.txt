@@ -1,0 +1,13 @@
+# Manual Domain List
+# ──────────────────────────────────────────────────────────────
+# Add one domain or URL per line.
+# Lines starting with # are comments and will be ignored.
+# Blank lines are also ignored.
+#
+# Examples:
+#   example-betting.com
+#   https://www.another-casino.in/en
+#   cricket-bet-india.live
+# ──────────────────────────────────────────────────────────────
+
+# Add your domains below:

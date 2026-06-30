@@ -1,0 +1,33 @@
+# ============================================================================
+# GAMBLING OSINT - Python Dependencies
+# ============================================================================
+# Install all dependencies:
+#   pip install -r requirements.txt
+# ============================================================================
+
+# DNS resolution
+dnspython>=2.4.0
+
+# IP/ASN WHOIS lookups
+ipwhois>=1.2.0
+
+# Domain extraction and normalization
+tldextract>=5.0.0
+
+# HTTP requests for website content fetching
+requests>=2.31.0
+
+# HTML parsing for classification
+beautifulsoup4>=4.12.0
+
+# Excel reading and writing
+openpyxl>=3.1.0
+
+# Data manipulation (optional, used for advanced analysis)
+pandas>=2.0.0
+
+# URL parsing (stdlib, no install needed)
+# urllib3 (installed with requests)
+
+# Web interface
+flask>=3.0.0
