@@ -321,6 +321,58 @@ def api_lookup():
     })
 
 
+@app.route("/api/screenshot_report", methods=["POST"])
+def api_screenshot_report():
+    """Step 3: Upload domains CSV/Excel/TXT → test liveness & capture screenshots → output Word document."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    uploaded = request.files["file"]
+    if not uploaded.filename:
+        return jsonify({"error": "Empty filename"}), 400
+
+    start = time.time()
+
+    # 1. Read domains
+    domains = read_domains_from_upload(uploaded)
+    if not domains:
+        return jsonify({"error": "No valid domains found in file"}), 400
+
+    # 2. Run liveness and generate report
+    from screenshot_manager import run_liveness_and_generate_report
+    
+    report_filename = f"liveness_report_{uuid.uuid4().hex[:8]}.docx"
+    try:
+        # Run Playwright concurrently & compile document
+        report_path = run_liveness_and_generate_report(list(domains), report_filename)
+        elapsed = round(time.time() - start, 1)
+        
+        return jsonify({
+            "success": True,
+            "total_domains": len(domains),
+            "elapsed_seconds": elapsed,
+            "download_filename": report_filename,
+        })
+    except Exception as e:
+        logger.error(f"Error in screenshot report generation: {e}")
+        return jsonify({"error": f"Failed to generate report: {str(e)}"}), 500
+
+
+@app.route("/api/download_report/<filename>")
+def api_download_report(filename):
+    """Download a generated DOCX report."""
+    filename = os.path.basename(filename)
+    path = os.path.join(config.OUTPUT_DIR, "temp", filename)
+    if os.path.exists(path):
+        return send_file(
+            path,
+            mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            as_attachment=True,
+            download_name=filename,
+        )
+    return jsonify({"error": "File not found"}), 404
+
+
 @app.route("/api/download/<download_id>")
 def api_download(download_id):
     """Download a generated CSV file."""

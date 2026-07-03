@@ -21,6 +21,7 @@ logs/*.log
 
 # Temp output files (keep structure, ignore generated data)
 output/temp/
+output/screenshots/
 output/*.csv
 output/*.xlsx
 

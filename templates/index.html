@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gambling OSINT — Domain Intelligence</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
         body {
             font-family: 'Inter', sans-serif;
@@ -24,6 +29,7 @@
             align-items: center;
             gap: 1rem;
         }
+
         header h1 {
             font-size: 1.3rem;
             font-weight: 700;
@@ -31,6 +37,7 @@
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
+
         header span {
             font-size: 0.8rem;
             color: #6b7280;
@@ -44,12 +51,12 @@
             margin: 2rem auto;
             padding: 0 1.5rem;
         }
+
         .steps {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 1.5rem;
         }
-        @media (max-width: 900px) { .steps { grid-template-columns: 1fr; } }
 
         /* ── Cards ────────────────────────────────────── */
         .card {
@@ -59,7 +66,10 @@
             padding: 1.5rem;
             transition: border-color 0.3s;
         }
-        .card:hover { border-color: rgba(99, 102, 241, 0.35); }
+
+        .card:hover {
+            border-color: rgba(99, 102, 241, 0.35);
+        }
 
         .card-header {
             display: flex;
@@ -67,6 +77,7 @@
             gap: 0.75rem;
             margin-bottom: 1rem;
         }
+
         .step-badge {
             background: linear-gradient(135deg, #6366f1, #818cf8);
             color: white;
@@ -75,9 +86,26 @@
             padding: 0.3rem 0.7rem;
             border-radius: 6px;
         }
-        .step-badge.step2 { background: linear-gradient(135deg, #10b981, #34d399); }
-        .card-header h2 { font-size: 1.05rem; font-weight: 600; }
-        .card-desc { font-size: 0.82rem; color: #9ca3af; margin-bottom: 1.2rem; line-height: 1.5; }
+
+        .step-badge.step2 {
+            background: linear-gradient(135deg, #10b981, #34d399);
+        }
+
+        .step-badge.step3 {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+        }
+
+        .card-header h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+        }
+
+        .card-desc {
+            font-size: 0.82rem;
+            color: #9ca3af;
+            margin-bottom: 1.2rem;
+            line-height: 1.5;
+        }
 
         /* ── Upload Zone ──────────────────────────────── */
         .upload-zone {
@@ -89,16 +117,34 @@
             transition: all 0.3s;
             position: relative;
         }
-        .upload-zone:hover, .upload-zone.dragover {
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
             border-color: #6366f1;
             background: rgba(99, 102, 241, 0.05);
         }
+
         .upload-zone input[type="file"] {
-            position: absolute; inset: 0; opacity: 0; cursor: pointer;
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
         }
-        .upload-icon { font-size: 2rem; margin-bottom: 0.5rem; }
-        .upload-text { font-size: 0.85rem; color: #9ca3af; }
-        .upload-text strong { color: #818cf8; }
+
+        .upload-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-text {
+            font-size: 0.85rem;
+            color: #9ca3af;
+        }
+
+        .upload-text strong {
+            color: #818cf8;
+        }
+
         .file-name {
             margin-top: 0.5rem;
             font-size: 0.8rem;
@@ -119,25 +165,68 @@
             cursor: pointer;
             transition: all 0.3s;
         }
+
         .btn-primary {
             background: linear-gradient(135deg, #6366f1, #4f46e5);
             color: white;
         }
-        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .btn-green {
             background: linear-gradient(135deg, #10b981, #059669);
             color: white;
         }
-        .btn-green:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
-        .btn-green:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-green:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-green:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .btn-purple {
+            background: linear-gradient(135deg, #a855f7, #7c3aed);
+            color: white;
+        }
+
+        .btn-purple:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);
+        }
+
+        .btn-purple:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
         .btn-download {
             background: linear-gradient(135deg, #f59e0b, #d97706);
             color: #111;
             margin-top: 0.75rem;
             display: none;
         }
-        .btn-download:hover { box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3); }
+
+        .btn-download:hover {
+            box-shadow: 0 4px 15px rgba(245, 158, 11, 0.3);
+        }
 
         /* ── Loader ───────────────────────────────────── */
         .loader {
@@ -145,17 +234,31 @@
             text-align: center;
             padding: 1.5rem 0;
         }
-        .loader.active { display: block; }
+
+        .loader.active {
+            display: block;
+        }
+
         .spinner {
-            width: 32px; height: 32px;
+            width: 32px;
+            height: 32px;
             border: 3px solid #1f2944;
             border-top-color: #6366f1;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
             margin: 0 auto 0.75rem;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .loader-text { font-size: 0.82rem; color: #9ca3af; }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loader-text {
+            font-size: 0.82rem;
+            color: #9ca3af;
+        }
 
         /* ── Stats Bar ────────────────────────────────── */
         .stats {
@@ -168,8 +271,15 @@
             font-size: 0.78rem;
             line-height: 1.7;
         }
-        .stats.active { display: block; }
-        .stats span { color: #818cf8; font-weight: 600; }
+
+        .stats.active {
+            display: block;
+        }
+
+        .stats span {
+            color: #818cf8;
+            font-weight: 600;
+        }
 
         /* ── Results Table ────────────────────────────── */
         .results-wrap {
@@ -180,20 +290,36 @@
             border: 1px solid #1f2944;
             border-radius: 8px;
         }
-        .results-wrap.active { display: block; }
-        .results-wrap::-webkit-scrollbar { width: 6px; }
-        .results-wrap::-webkit-scrollbar-track { background: #0f1629; }
-        .results-wrap::-webkit-scrollbar-thumb { background: #2d3a56; border-radius: 3px; }
+
+        .results-wrap.active {
+            display: block;
+        }
+
+        .results-wrap::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .results-wrap::-webkit-scrollbar-track {
+            background: #0f1629;
+        }
+
+        .results-wrap::-webkit-scrollbar-thumb {
+            background: #2d3a56;
+            border-radius: 3px;
+        }
 
         table {
             width: 100%;
             border-collapse: collapse;
             font-size: 0.78rem;
         }
+
         thead {
-            position: sticky; top: 0;
+            position: sticky;
+            top: 0;
             background: #151c30;
         }
+
         th {
             padding: 0.6rem 0.75rem;
             text-align: left;
@@ -202,253 +328,301 @@
             border-bottom: 1px solid #2d3a56;
             white-space: nowrap;
         }
+
         td {
             padding: 0.45rem 0.75rem;
             border-bottom: 1px solid #141a2e;
             color: #d1d5db;
             word-break: break-all;
         }
-        tr:hover td { background: rgba(99, 102, 241, 0.04); }
+
+        tr:hover td {
+            background: rgba(99, 102, 241, 0.04);
+        }
 
         /* ── Full-width results section ───────────────── */
         .full-results {
             margin-top: 1.5rem;
         }
+
         .full-results .card {
             width: 100%;
         }
+
         .full-results .results-wrap {
             max-height: 500px;
         }
     </style>
 </head>
+
 <body>
 
-<header>
-    <h1>Gambling OSINT</h1>
-    <span>Cyber Threat Intelligence — Domain Discovery & Infrastructure Lookup</span>
-</header>
+    <header>
+        <h1>Gambling OSINT</h1>
+        <span>Cyber Threat Intelligence — Domain Discovery & Infrastructure Lookup</span>
+    </header>
 
-<div class="container">
-    <div class="steps">
-        <!-- ═══════════ STEP 1 ═══════════ -->
-        <div class="card">
-            <div class="card-header">
-                <div class="step-badge">STEP 1</div>
-                <h2>Find New Gambling Domains</h2>
-            </div>
-            <p class="card-desc">
-                Upload your CSV or Excel file containing known gambling sites.
-                The system will generate domain variations, validate them via DNS,
-                and return <strong>new unique main domains</strong> (deduplicated — one per brand).
-            </p>
+    <div class="container">
+        <div class="steps">
+            <!-- ═══════════ STEP 1 ═══════════ -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="step-badge">STEP 1</div>
+                    <h2>Find New Gambling Domains</h2>
+                </div>
+                <p class="card-desc">
+                    Upload your CSV or Excel file containing known gambling sites.
+                    The system will generate domain variations, validate them via DNS,
+                    and return <strong>new unique main domains</strong> (deduplicated — one per brand).
+                </p>
 
-            <div class="upload-zone" id="zone1">
-                <input type="file" id="file1" accept=".csv,.xlsx,.xls,.txt">
-                <div class="upload-icon">&#128194;</div>
-                <div class="upload-text">Drop CSV / Excel here or <strong>click to browse</strong></div>
-                <div class="file-name" id="fname1"></div>
-            </div>
+                <div class="upload-zone" id="zone1">
+                    <input type="file" id="file1" accept=".csv,.xlsx,.xls,.txt">
+                    <div class="upload-icon">&#128194;</div>
+                    <div class="upload-text">Drop CSV / Excel here or <strong>click to browse</strong></div>
+                    <div class="file-name" id="fname1"></div>
+                </div>
 
-            <button class="btn btn-primary" id="btn1" disabled onclick="runExpand()">
-                Find New Domains
-            </button>
+                <button class="btn btn-primary" id="btn1" disabled onclick="runExpand()">
+                    Find New Domains
+                </button>
 
-            <div class="loader" id="loader1">
-                <div class="spinner"></div>
-                <div class="loader-text">Generating &amp; validating domains... ~1–2 min</div>
-            </div>
+                <div class="loader" id="loader1">
+                    <div class="spinner"></div>
+                    <div class="loader-text">Generating &amp; validating domains... ~1–2 min</div>
+                </div>
 
-            <div class="stats" id="stats1"></div>
+                <div class="stats" id="stats1"></div>
 
-            <div class="results-wrap" id="results1"></div>
+                <div class="results-wrap" id="results1"></div>
 
-            <button class="btn btn-download" id="dl1" onclick="downloadFile(1)">
-                Download Main Domains CSV
-            </button>
-        </div>
-
-        <!-- ═══════════ STEP 2 ═══════════ -->
-        <div class="card">
-            <div class="card-header">
-                <div class="step-badge step2">STEP 2</div>
-                <h2>Infrastructure Lookup</h2>
-            </div>
-            <p class="card-desc">
-                Upload the main domains CSV (from Step 1 or your own list).
-                The system will look up <strong>IPv4, IPv6, Hosting Provider, ASN, Country</strong>
-                for each domain — same as main2.py but in bulk.
-            </p>
-
-            <div class="upload-zone" id="zone2">
-                <input type="file" id="file2" accept=".csv,.xlsx,.xls,.txt">
-                <div class="upload-icon">&#128269;</div>
-                <div class="upload-text">Drop domains CSV here or <strong>click to browse</strong></div>
-                <div class="file-name" id="fname2"></div>
+                <button class="btn btn-download" id="dl1" onclick="downloadFile(1)">
+                    Download Main Domains CSV
+                </button>
             </div>
 
-            <button class="btn btn-green" id="btn2" disabled onclick="runLookup()">
-                Run Infrastructure Lookup
-            </button>
+            <!-- ═══════════ STEP 2 ═══════════ -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="step-badge step2">STEP 2</div>
+                    <h2>Infrastructure Lookup</h2>
+                </div>
+                <p class="card-desc">
+                    Upload the main domains CSV (from Step 1 or your own list).
+                    The system will look up <strong>IPv4, IPv6, Hosting Provider, ASN, Country</strong>
+                    for each domain — same as main2.py but in bulk.
+                </p>
 
-            <div class="loader" id="loader2">
-                <div class="spinner" style="border-top-color: #10b981;"></div>
-                <div class="loader-text">Looking up DNS &amp; RDAP info... ~1–3 min</div>
+                <div class="upload-zone" id="zone2">
+                    <input type="file" id="file2" accept=".csv,.xlsx,.xls,.txt">
+                    <div class="upload-icon">&#128269;</div>
+                    <div class="upload-text">Drop domains CSV here or <strong>click to browse</strong></div>
+                    <div class="file-name" id="fname2"></div>
+                </div>
+
+                <button class="btn btn-green" id="btn2" disabled onclick="runLookup()">
+                    Run Infrastructure Lookup
+                </button>
+
+                <div class="loader" id="loader2">
+                    <div class="spinner" style="border-top-color: #10b981;"></div>
+                    <div class="loader-text">Looking up DNS &amp; RDAP info... ~1–3 min</div>
+                </div>
+
+                <div class="stats" id="stats2"></div>
+
+                <div class="results-wrap" id="results2"></div>
+
+                <button class="btn btn-download" id="dl2" onclick="downloadFile(2)">
+                    Download Infrastructure CSV
+                </button>
             </div>
 
-            <div class="stats" id="stats2"></div>
+            <!-- ═══════════ STEP 3 ═══════════ -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="step-badge step3">STEP 3</div>
+                    <h2>Liveness &amp; Screenshot Report</h2>
+                </div>
+                <p class="card-desc">
+                    Upload a list of domains. The system will verify if they are active/working,
+                    capture a browser screenshot of the live ones, and compile a 
+                    comprehensive <strong>Word Document report (.docx)</strong>.
+                </p>
 
-            <div class="results-wrap" id="results2"></div>
+                <div class="upload-zone" id="zone3">
+                    <input type="file" id="file3" accept=".csv,.xlsx,.xls,.txt">
+                    <div class="upload-icon">&#128247;</div>
+                    <div class="upload-text">Drop domains list here or <strong>click to browse</strong></div>
+                    <div class="file-name" id="fname3"></div>
+                </div>
 
-            <button class="btn btn-download" id="dl2" onclick="downloadFile(2)">
-                Download Infrastructure CSV
-            </button>
+                <button class="btn btn-purple" id="btn3" disabled onclick="runScreenshotReport()">
+                    Generate Screenshot Report
+                </button>
+
+                <div class="loader" id="loader3">
+                    <div class="spinner" style="border-top-color: #a855f7;"></div>
+                    <div class="loader-text">Verifying liveness &amp; capturing screenshots... ~1-3 min</div>
+                </div>
+
+                <div class="stats" id="stats3"></div>
+
+                <button class="btn btn-download" id="dl3" onclick="downloadReport()">
+                    Download Word Report (.docx)
+                </button>
+            </div>
         </div>
     </div>
-</div>
 
-<script>
-    // ── State ──
-    let downloadIds = { 1: null, 2: null };
+    <script>
+        // ── State ──
+        let downloadIds = { 1: null, 2: null };
+        let reportDownloadFilename = null;
 
-    // ── File select handlers ──
-    document.getElementById('file1').addEventListener('change', function() {
-        const name = this.files[0]?.name || '';
-        document.getElementById('fname1').textContent = name;
-        document.getElementById('btn1').disabled = !name;
-    });
-    document.getElementById('file2').addEventListener('change', function() {
-        const name = this.files[0]?.name || '';
-        document.getElementById('fname2').textContent = name;
-        document.getElementById('btn2').disabled = !name;
-    });
-
-    // ── Drag & drop ──
-    ['zone1', 'zone2'].forEach(id => {
-        const zone = document.getElementById(id);
-        zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
-        zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
-        zone.addEventListener('drop', e => {
-            e.preventDefault();
-            zone.classList.remove('dragover');
-            const input = zone.querySelector('input');
-            input.files = e.dataTransfer.files;
-            input.dispatchEvent(new Event('change'));
+        // ── File select handlers ──
+        document.getElementById('file1').addEventListener('change', function () {
+            const name = this.files[0]?.name || '';
+            document.getElementById('fname1').textContent = name;
+            document.getElementById('btn1').disabled = !name;
         });
-    });
+        document.getElementById('file2').addEventListener('change', function () {
+            const name = this.files[0]?.name || '';
+            document.getElementById('fname2').textContent = name;
+            document.getElementById('btn2').disabled = !name;
+        });
+        document.getElementById('file3').addEventListener('change', function () {
+            const name = this.files[0]?.name || '';
+            document.getElementById('fname3').textContent = name;
+            document.getElementById('btn3').disabled = !name;
+        });
 
-    // ── Step 1: Expand ──
-    async function runExpand() {
-        const file = document.getElementById('file1').files[0];
-        if (!file) return;
+        // ── Drag & drop ──
+        ['zone1', 'zone2', 'zone3'].forEach(id => {
+            const zone = document.getElementById(id);
+            zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+            zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+            zone.addEventListener('drop', e => {
+                e.preventDefault();
+                zone.classList.remove('dragover');
+                const input = zone.querySelector('input');
+                input.files = e.dataTransfer.files;
+                input.dispatchEvent(new Event('change'));
+            });
+        });
 
-        const btn = document.getElementById('btn1');
-        const loader = document.getElementById('loader1');
-        const stats = document.getElementById('stats1');
-        const results = document.getElementById('results1');
-        const dl = document.getElementById('dl1');
+        // ── Step 1: Expand ──
+        async function runExpand() {
+            const file = document.getElementById('file1').files[0];
+            if (!file) return;
 
-        btn.disabled = true;
-        loader.classList.add('active');
-        stats.classList.remove('active');
-        results.classList.remove('active');
-        dl.style.display = 'none';
+            const btn = document.getElementById('btn1');
+            const loader = document.getElementById('loader1');
+            const stats = document.getElementById('stats1');
+            const results = document.getElementById('results1');
+            const dl = document.getElementById('dl1');
 
-        const form = new FormData();
-        form.append('file', file);
+            btn.disabled = true;
+            loader.classList.add('active');
+            stats.classList.remove('active');
+            results.classList.remove('active');
+            dl.style.display = 'none';
 
-        try {
-            const resp = await fetch('/api/expand', { method: 'POST', body: form });
-            const data = await resp.json();
+            const form = new FormData();
+            form.append('file', file);
 
-            loader.classList.remove('active');
+            try {
+                const resp = await fetch('/api/expand', { method: 'POST', body: form });
+                const data = await resp.json();
 
-            if (data.error) {
-                stats.innerHTML = `<span style="color:#ef4444;">Error:</span> ${data.error}`;
-                stats.classList.add('active');
-                btn.disabled = false;
-                return;
-            }
+                loader.classList.remove('active');
 
-            downloadIds[1] = data.download_id;
+                if (data.error) {
+                    stats.innerHTML = `<span style="color:#ef4444;">Error:</span> ${data.error}`;
+                    stats.classList.add('active');
+                    btn.disabled = false;
+                    return;
+                }
 
-            stats.innerHTML = `
+                downloadIds[1] = data.download_id;
+
+                stats.innerHTML = `
                 Seeds: <span>${data.seeds}</span> &nbsp;|&nbsp;
                 Candidates checked: <span>${data.candidates_checked}</span> &nbsp;|&nbsp;
                 Resolved: <span>${data.total_resolved}</span> &nbsp;|&nbsp;
                 <strong>Main domains: <span>${data.main_domains}</span></strong> &nbsp;|&nbsp;
                 Time: <span>${data.elapsed_seconds}s</span>
             `;
-            stats.classList.add('active');
-
-            // Build table
-            if (data.domains && data.domains.length > 0) {
-                let html = '<table><thead><tr><th>#</th><th>Domain</th><th>IP Address</th></tr></thead><tbody>';
-                data.domains.forEach((d, i) => {
-                    html += `<tr><td>${i+1}</td><td>${d.domain}</td><td>${d.ip_address}</td></tr>`;
-                });
-                html += '</tbody></table>';
-                results.innerHTML = html;
-                results.classList.add('active');
-                dl.style.display = 'block';
-            }
-        } catch (err) {
-            loader.classList.remove('active');
-            stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
-            stats.classList.add('active');
-        }
-        btn.disabled = false;
-    }
-
-    // ── Step 2: Lookup ──
-    async function runLookup() {
-        const file = document.getElementById('file2').files[0];
-        if (!file) return;
-
-        const btn = document.getElementById('btn2');
-        const loader = document.getElementById('loader2');
-        const stats = document.getElementById('stats2');
-        const results = document.getElementById('results2');
-        const dl = document.getElementById('dl2');
-
-        btn.disabled = true;
-        loader.classList.add('active');
-        stats.classList.remove('active');
-        results.classList.remove('active');
-        dl.style.display = 'none';
-
-        const form = new FormData();
-        form.append('file', file);
-
-        try {
-            const resp = await fetch('/api/lookup', { method: 'POST', body: form });
-            const data = await resp.json();
-
-            loader.classList.remove('active');
-
-            if (data.error) {
-                stats.innerHTML = `<span style="color:#ef4444;">Error:</span> ${data.error}`;
                 stats.classList.add('active');
-                btn.disabled = false;
-                return;
+
+                // Build table
+                if (data.domains && data.domains.length > 0) {
+                    let html = '<table><thead><tr><th>#</th><th>Domain</th><th>IP Address</th></tr></thead><tbody>';
+                    data.domains.forEach((d, i) => {
+                        html += `<tr><td>${i + 1}</td><td>${d.domain}</td><td>${d.ip_address}</td></tr>`;
+                    });
+                    html += '</tbody></table>';
+                    results.innerHTML = html;
+                    results.classList.add('active');
+                    dl.style.display = 'block';
+                }
+            } catch (err) {
+                loader.classList.remove('active');
+                stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
+                stats.classList.add('active');
             }
+            btn.disabled = false;
+        }
 
-            downloadIds[2] = data.download_id;
+        // ── Step 2: Lookup ──
+        async function runLookup() {
+            const file = document.getElementById('file2').files[0];
+            if (!file) return;
 
-            stats.innerHTML = `
+            const btn = document.getElementById('btn2');
+            const loader = document.getElementById('loader2');
+            const stats = document.getElementById('stats2');
+            const results = document.getElementById('results2');
+            const dl = document.getElementById('dl2');
+
+            btn.disabled = true;
+            loader.classList.add('active');
+            stats.classList.remove('active');
+            results.classList.remove('active');
+            dl.style.display = 'none';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const resp = await fetch('/api/lookup', { method: 'POST', body: form });
+                const data = await resp.json();
+
+                loader.classList.remove('active');
+
+                if (data.error) {
+                    stats.innerHTML = `<span style="color:#ef4444;">Error:</span> ${data.error}`;
+                    stats.classList.add('active');
+                    btn.disabled = false;
+                    return;
+                }
+
+                downloadIds[2] = data.download_id;
+
+                stats.innerHTML = `
                 Domains looked up: <span>${data.total_domains}</span> &nbsp;|&nbsp;
                 Time: <span>${data.elapsed_seconds}s</span>
             `;
-            stats.classList.add('active');
+                stats.classList.add('active');
 
-            if (data.results && data.results.length > 0) {
-                let html = `<table><thead><tr>
+                if (data.results && data.results.length > 0) {
+                    let html = `<table><thead><tr>
                     <th>#</th><th>Domain</th><th>IPv4</th><th>IPv6</th>
                     <th>Hosting</th><th>Country</th><th>ASN</th><th>ASN Desc</th>
                 </tr></thead><tbody>`;
-                data.results.forEach((r, i) => {
-                    html += `<tr>
-                        <td>${i+1}</td>
+                    data.results.forEach((r, i) => {
+                        html += `<tr>
+                        <td>${i + 1}</td>
                         <td>${r.domain}</td>
                         <td>${r.ipv4_addresses || '-'}</td>
                         <td>${r.ipv6_addresses || '-'}</td>
@@ -457,26 +631,80 @@
                         <td>${r.asn || '-'}</td>
                         <td>${r.asn_description || '-'}</td>
                     </tr>`;
-                });
-                html += '</tbody></table>';
-                results.innerHTML = html;
-                results.classList.add('active');
-                dl.style.display = 'block';
+                    });
+                    html += '</tbody></table>';
+                    results.innerHTML = html;
+                    results.classList.add('active');
+                    dl.style.display = 'block';
+                }
+            } catch (err) {
+                loader.classList.remove('active');
+                stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
+                stats.classList.add('active');
             }
-        } catch (err) {
-            loader.classList.remove('active');
-            stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
-            stats.classList.add('active');
+            btn.disabled = false;
         }
-        btn.disabled = false;
-    }
 
-    // ── Download ──
-    function downloadFile(step) {
-        const id = downloadIds[step];
-        if (id) window.location.href = `/api/download/${id}`;
-    }
-</script>
+        // ── Step 3: Screenshot Report ──
+        async function runScreenshotReport() {
+            const file = document.getElementById('file3').files[0];
+            if (!file) return;
+
+            const btn = document.getElementById('btn3');
+            const loader = document.getElementById('loader3');
+            const stats = document.getElementById('stats3');
+            const dl = document.getElementById('dl3');
+
+            btn.disabled = true;
+            loader.classList.add('active');
+            stats.classList.remove('active');
+            dl.style.display = 'none';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const resp = await fetch('/api/screenshot_report', { method: 'POST', body: form });
+                const data = await resp.json();
+
+                loader.classList.remove('active');
+
+                if (data.error) {
+                    stats.innerHTML = `<span style="color:#ef4444;">Error:</span> ${data.error}`;
+                    stats.classList.add('active');
+                    btn.disabled = false;
+                    return;
+                }
+
+                reportDownloadFilename = data.download_filename;
+
+                stats.innerHTML = `
+                    Domains Processed: <span>${data.total_domains}</span> &nbsp;|&nbsp;
+                    Time: <span>${data.elapsed_seconds}s</span>
+                `;
+                stats.classList.add('active');
+                dl.style.display = 'block';
+            } catch (err) {
+                loader.classList.remove('active');
+                stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
+                stats.classList.add('active');
+            }
+            btn.disabled = false;
+        }
+
+        // ── Download ──
+        function downloadFile(step) {
+            const id = downloadIds[step];
+            if (id) window.location.href = `/api/download/${id}`;
+        }
+
+        function downloadReport() {
+            if (reportDownloadFilename) {
+                window.location.href = `/api/download_report/${reportDownloadFilename}`;
+            }
+        }
+    </script>
 
 </body>
+
 </html>
