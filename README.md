@@ -163,6 +163,9 @@ venv\Scripts\activate        # Windows
 
 # 3. Install dependencies
 pip install -r requirements.txt
+
+# 4. Install Playwright browser binaries (required for screenshots/liveness checking)
+playwright install chromium
 ```
 
 ---

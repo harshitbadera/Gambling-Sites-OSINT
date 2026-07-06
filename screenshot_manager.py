@@ -72,16 +72,38 @@ async def check_liveness_and_screenshot(browser, domain: str, sem: asyncio.Semap
 async def run_screenshot_pipeline(domains: list) -> list:
     """
     Execute Playwright concurrent screenshot jobs.
+    Auto-installs chromium if not found.
     """
     # Limit to 5 concurrent browser tabs to avoid memory/CPU spikes
     sem = asyncio.Semaphore(5)
     
     async with async_playwright() as p:
-        # Launch headless browser
-        browser = await p.chromium.launch(
-            headless=True,
-            args=["--disable-web-security", "--ignore-certificate-errors"]
-        )
+        try:
+            # Launch headless browser
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--disable-web-security", "--ignore-certificate-errors"]
+            )
+        except Exception as e:
+            error_str = str(e)
+            if "executable doesn't exist" in error_str.lower() or "playwright install" in error_str.lower():
+                print("Playwright chromium browser not found. Attempting automatic installation...")
+                import subprocess
+                import sys
+                try:
+                    # Run the installation command synchronously
+                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                    print("Playwright chromium browser installed successfully. Retrying browser launch...")
+                    # Try launching again
+                    browser = await p.chromium.launch(
+                        headless=True,
+                        args=["--disable-web-security", "--ignore-certificate-errors"]
+                    )
+                except Exception as install_err:
+                    print(f"Automatic Playwright installation failed: {install_err}")
+                    raise e
+            else:
+                raise e
         
         tasks = [check_liveness_and_screenshot(browser, d, sem) for d in domains]
         results = await asyncio.gather(*tasks)

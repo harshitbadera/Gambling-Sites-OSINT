@@ -355,7 +355,12 @@ def api_screenshot_report():
         })
     except Exception as e:
         logger.error(f"Error in screenshot report generation: {e}")
-        return jsonify({"error": f"Failed to generate report: {str(e)}"}), 500
+        error_msg = str(e)
+        if "playwright install" in error_msg.lower() or "executable doesn't exist" in error_msg.lower() or "not installed" in error_msg.lower() or "call playwright install" in error_msg.lower():
+            return jsonify({
+                "error": "Playwright browser binaries are not installed. Please run 'playwright install' or 'python -m playwright install' in your terminal."
+            }), 500
+        return jsonify({"error": f"Failed to generate report: {error_msg}"}), 500
 
 
 @app.route("/api/download_report/<filename>")
@@ -395,12 +400,21 @@ def api_download(download_id):
 
 if __name__ == "__main__":
     # Check dependencies first
+    dependencies_to_check = {
+        "flask": "flask",
+        "dns.resolver": "dnspython",
+        "tldextract": "tldextract",
+        "openpyxl": "openpyxl",
+        "ipwhois": "ipwhois",
+        "playwright": "playwright",
+        "docx": "python-docx"
+    }
     missing = []
-    for pkg in ["flask", "dns.resolver", "tldextract", "openpyxl", "ipwhois"]:
+    for pkg, pip_name in dependencies_to_check.items():
         try:
             __import__(pkg)
         except ImportError:
-            missing.append(pkg.replace("dns.resolver", "dnspython"))
+            missing.append(pip_name)
 
     if missing:
         print("\n  ERROR: Missing dependencies!")
@@ -409,9 +423,12 @@ if __name__ == "__main__":
         exit(1)
 
     print()
-    print("=" * 50)
+    print("=" * 55)
     print("  GAMBLING OSINT - Web Interface")
     print("  Open: http://localhost:5000")
-    print("=" * 50)
+    print("=" * 55)
+    print("  * Note: If using Step 3 (Screenshots), ensure you ran:")
+    print("    'playwright install' after installing dependencies.")
+    print("=" * 55)
     print()
     app.run(debug=True, host="0.0.0.0", port=5000)
