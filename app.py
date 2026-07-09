@@ -20,6 +20,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+import requests as http_requests
 from flask import Flask, request, jsonify, render_template, send_file
 
 import dns.resolver
@@ -45,6 +46,143 @@ app.config["MAX_CONTENT_LENGTH"] = 16 * 1024 * 1024  # 16 MB
 # Store generated files temporarily
 TEMP_DIR = os.path.join(config.OUTPUT_DIR, "temp")
 os.makedirs(TEMP_DIR, exist_ok=True)
+
+# ── ASNs to skip for reverse IP (shared/CDN infrastructure — too many sites) ──
+SKIP_ASNS = {
+    "13335",   # Cloudflare
+    "16509",   # Amazon AWS
+    "15169",   # Google
+    "14618",   # Amazon
+    "8075",    # Microsoft Azure
+    "20940",   # Akamai
+    "54113",   # Fastly
+    "396982",  # Google Cloud
+    "36492",   # Google (extra)
+    "32934",   # Facebook/Meta
+}
+
+# Gambling keywords used to filter reverse IP results
+GAMBLING_FILTER_KEYWORDS = [
+    "bet", "betting", "casino", "poker", "slot", "slots",
+    "gambl", "rummy", "satta", "matka", "teenpatti",
+    "jackpot", "lottery", "bingo", "wager", "punt",
+    "bookmaker", "sportsbook", "odds", "spin",
+    "roulette", "baccarat", "blackjack", "playwin",
+    "winner", "lotto", "keno", "jeet", "baazi",
+    "cric", "win", "play", "luck", "royal",
+    "king", "mega", "super", "gold", "ace",
+]
+
+
+def reverse_ip_lookup(ip: str) -> list:
+    """
+    Query HackerTarget free API for all domains hosted on a given IP.
+    Free tier: 100 queries/day. Returns list of domain strings.
+    """
+    try:
+        url = f"https://api.hackertarget.com/reverseiplookup/?q={ip}"
+        resp = http_requests.get(url, timeout=10)
+
+        if resp.status_code != 200:
+            return []
+
+        text = resp.text.strip()
+
+        # HackerTarget returns "error ..." or "API count exceeded" on failure
+        if text.startswith("error") or "API count" in text or not text:
+            logger.warning(f"HackerTarget limit/error for {ip}: {text[:80]}")
+            return []
+
+        domains = []
+        for line in text.split("\n"):
+            d = line.strip().lower()
+            if d and is_valid_domain(d):
+                domains.append(d)
+
+        return domains
+    except Exception as e:
+        logger.error(f"Reverse IP lookup failed for {ip}: {e}")
+        return []
+
+
+def run_reverse_ip_pivot(lookup_results: list, input_domains: set) -> list:
+    """
+    Take the infrastructure lookup results from Step 2, filter to non-CDN IPs,
+    run reverse IP lookups, and return newly discovered gambling domains
+    with their hosting server info.
+    """
+    # 1. Collect unique IPs that are NOT on big CDN/cloud ASNs
+    ip_to_info = {}  # ip → {hosting_provider, asn, asn_description, country}
+    for r in lookup_results:
+        asn = str(r.get("asn", "")).strip()
+        if asn in SKIP_ASNS or not asn:
+            continue
+
+        # Get IPs from the result
+        ipv4_str = r.get("ipv4_addresses", "")
+        if not ipv4_str:
+            continue
+
+        for ip in ipv4_str.split(";"):
+            ip = ip.strip()
+            if ip and ip not in ip_to_info:
+                ip_to_info[ip] = {
+                    "hosting_provider": r.get("hosting_provider", ""),
+                    "asn": asn,
+                    "asn_description": r.get("asn_description", ""),
+                    "country": r.get("country", ""),
+                    "source_domain": r.get("domain", ""),
+                }
+
+    logger.info(
+        f"Reverse IP pivot: {len(ip_to_info)} unique non-CDN IPs to query "
+        f"(skipped CDN ASNs: {SKIP_ASNS})"
+    )
+
+    if not ip_to_info:
+        return []
+
+    # 2. Reverse IP lookup on each (sequential to respect rate limits)
+    all_discovered = {}  # domain → info dict
+    for ip, info in ip_to_info.items():
+        domains = reverse_ip_lookup(ip)
+        logger.info(f"  Reverse IP {ip} ({info['source_domain']}): {len(domains)} domains found")
+
+        for d in domains:
+            # Normalize to main domain
+            nd = normalize_domain(d)
+            if not nd or not is_valid_domain(nd):
+                continue
+
+            # Skip domains already in the input set
+            if nd in input_domains:
+                continue
+
+            # Skip if already discovered
+            if nd in all_discovered:
+                continue
+
+            # Filter: domain name should contain at least one gambling keyword
+            has_keyword = any(kw in nd for kw in GAMBLING_FILTER_KEYWORDS)
+            if not has_keyword:
+                continue
+
+            all_discovered[nd] = {
+                "domain": nd,
+                "found_on_ip": ip,
+                "hosting_provider": info["hosting_provider"],
+                "asn": info["asn"],
+                "asn_description": info["asn_description"],
+                "country": info["country"],
+                "discovered_from": info["source_domain"],
+            }
+
+        # Small delay between queries to be respectful
+        time.sleep(1.5)
+
+    result = sorted(all_discovered.values(), key=lambda x: x["domain"])
+    logger.info(f"Reverse IP pivot: {len(result)} new gambling domains discovered")
+    return result
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -275,7 +413,7 @@ def api_expand():
 
 @app.route("/api/lookup", methods=["POST"])
 def api_lookup():
-    """Step 2: Upload domains CSV → infrastructure lookup for each."""
+    """Step 2: Upload domains CSV → infrastructure lookup + reverse IP pivot."""
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
@@ -298,9 +436,9 @@ def api_lookup():
             results.append(future.result())
 
     results.sort(key=lambda x: x["domain"])
-    elapsed = round(time.time() - start, 1)
+    lookup_elapsed = round(time.time() - start, 1)
 
-    # 3. Save CSV
+    # 3. Save infrastructure CSV
     csv_id = uuid.uuid4().hex[:8]
     csv_path = os.path.join(TEMP_DIR, f"lookup_{csv_id}.csv")
     fieldnames = [
@@ -312,12 +450,47 @@ def api_lookup():
         writer.writeheader()
         writer.writerows(results)
 
+    # 4. Reverse IP Pivot — find new gambling domains from shared hosting
+    pivot_results = run_reverse_ip_pivot(results, domains)
+    total_elapsed = round(time.time() - start, 1)
+
+    # 5. Save pivot results CSV (if any found)
+    pivot_csv_id = None
+    if pivot_results:
+        pivot_csv_id = uuid.uuid4().hex[:8]
+        pivot_path = os.path.join(TEMP_DIR, f"pivot_{pivot_csv_id}.csv")
+        pivot_fields = [
+            "domain", "found_on_ip", "hosting_provider",
+            "asn", "asn_description", "country", "discovered_from",
+        ]
+        with open(pivot_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=pivot_fields)
+            writer.writeheader()
+            writer.writerows(pivot_results)
+
+    # Count how many non-CDN IPs were queried
+    non_cdn_ips = set()
+    for r in results:
+        asn = str(r.get("asn", "")).strip()
+        if asn and asn not in SKIP_ASNS and r.get("ipv4_addresses"):
+            for ip in r["ipv4_addresses"].split(";"):
+                ip = ip.strip()
+                if ip:
+                    non_cdn_ips.add(ip)
+
     return jsonify({
         "success": True,
         "total_domains": len(domains),
-        "elapsed_seconds": elapsed,
+        "elapsed_seconds": total_elapsed,
+        "lookup_elapsed": lookup_elapsed,
         "download_id": csv_id,
         "results": results,
+        # Pivot data
+        "pivot_download_id": pivot_csv_id,
+        "pivot_results": pivot_results,
+        "pivot_new_domains": len(pivot_results),
+        "pivot_ips_queried": len(non_cdn_ips),
+        "pivot_ips_skipped_cdn": len(domains) - len(non_cdn_ips),
     })
 
 
@@ -381,8 +554,8 @@ def api_download_report(filename):
 @app.route("/api/download/<download_id>")
 def api_download(download_id):
     """Download a generated CSV file."""
-    # Check both prefixes
-    for prefix in ["expanded_", "lookup_"]:
+    # Check all prefixes
+    for prefix in ["expanded_", "lookup_", "pivot_"]:
         path = os.path.join(TEMP_DIR, f"{prefix}{download_id}.csv")
         if os.path.exists(path):
             return send_file(

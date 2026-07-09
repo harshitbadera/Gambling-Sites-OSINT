@@ -410,7 +410,8 @@
                 <p class="card-desc">
                     Upload the main domains CSV (from Step 1 or your own list).
                     The system will look up <strong>IPv4, IPv6, Hosting Provider, ASN, Country</strong>
-                    for each domain — same as main2.py but in bulk.
+                    for each domain, then <strong>automatically pivot</strong> on non-CDN IPs
+                    to discover new gambling domains sharing the same servers.
                 </p>
 
                 <div class="upload-zone" id="zone2">
@@ -426,7 +427,7 @@
 
                 <div class="loader" id="loader2">
                     <div class="spinner" style="border-top-color: #10b981;"></div>
-                    <div class="loader-text">Looking up DNS &amp; RDAP info... ~1–3 min</div>
+                    <div class="loader-text">Looking up DNS &amp; RDAP info, then pivoting on IPs... ~2–5 min</div>
                 </div>
 
                 <div class="stats" id="stats2"></div>
@@ -435,6 +436,16 @@
 
                 <button class="btn btn-download" id="dl2" onclick="downloadFile(2)">
                     Download Infrastructure CSV
+                </button>
+
+                <!-- Pivot results section -->
+                <div class="stats" id="pivotStats" style="display:none; margin-top:1rem; border-color:rgba(245,158,11,0.3); background:rgba(245,158,11,0.08);">
+                </div>
+
+                <div class="results-wrap" id="pivotResults" style="display:none; margin-top:0.75rem;"></div>
+
+                <button class="btn btn-download" id="dlPivot" style="display:none; background:linear-gradient(135deg,#f59e0b,#d97706); color:#111;" onclick="downloadPivot()">
+                    Download Discovered Domains CSV
                 </button>
             </div>
 
@@ -575,6 +586,8 @@
         }
 
         // ── Step 2: Lookup ──
+        let pivotDownloadId = null;
+
         async function runLookup() {
             const file = document.getElementById('file2').files[0];
             if (!file) return;
@@ -584,12 +597,19 @@
             const stats = document.getElementById('stats2');
             const results = document.getElementById('results2');
             const dl = document.getElementById('dl2');
+            const pivotStats = document.getElementById('pivotStats');
+            const pivotResults = document.getElementById('pivotResults');
+            const dlPivot = document.getElementById('dlPivot');
 
             btn.disabled = true;
             loader.classList.add('active');
             stats.classList.remove('active');
             results.classList.remove('active');
             dl.style.display = 'none';
+            pivotStats.style.display = 'none';
+            pivotResults.style.display = 'none';
+            dlPivot.style.display = 'none';
+            pivotDownloadId = null;
 
             const form = new FormData();
             form.append('file', file);
@@ -611,10 +631,12 @@
 
                 stats.innerHTML = `
                 Domains looked up: <span>${data.total_domains}</span> &nbsp;|&nbsp;
-                Time: <span>${data.elapsed_seconds}s</span>
+                Infra time: <span>${data.lookup_elapsed}s</span> &nbsp;|&nbsp;
+                Total time: <span>${data.elapsed_seconds}s</span>
             `;
                 stats.classList.add('active');
 
+                // Infrastructure table
                 if (data.results && data.results.length > 0) {
                     let html = `<table><thead><tr>
                     <th>#</th><th>Domain</th><th>IPv4</th><th>IPv6</th>
@@ -637,12 +659,47 @@
                     results.classList.add('active');
                     dl.style.display = 'block';
                 }
+
+                // Pivot results
+                pivotStats.innerHTML = `
+                    <strong style="color:#f59e0b;">&#128270; Reverse IP Pivot:</strong>&nbsp;
+                    Non-CDN IPs queried: <span style="color:#f59e0b;">${data.pivot_ips_queried}</span> &nbsp;|&nbsp;
+                    CDN IPs skipped: <span>${data.pivot_ips_skipped_cdn}</span> &nbsp;|&nbsp;
+                    <strong>New gambling domains found: <span style="color:#f59e0b;">${data.pivot_new_domains}</span></strong>
+                `;
+                pivotStats.style.display = 'block';
+
+                if (data.pivot_results && data.pivot_results.length > 0) {
+                    pivotDownloadId = data.pivot_download_id;
+                    let html = `<table><thead><tr>
+                        <th>#</th><th>Domain</th><th>Found on IP</th>
+                        <th>Hosting Provider</th><th>Country</th><th>Discovered From</th>
+                    </tr></thead><tbody>`;
+                    data.pivot_results.forEach((r, i) => {
+                        html += `<tr>
+                            <td>${i + 1}</td>
+                            <td>${r.domain}</td>
+                            <td>${r.found_on_ip || '-'}</td>
+                            <td>${r.hosting_provider || '-'}</td>
+                            <td>${r.country || '-'}</td>
+                            <td>${r.discovered_from || '-'}</td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    pivotResults.innerHTML = html;
+                    pivotResults.style.display = 'block';
+                    dlPivot.style.display = 'block';
+                }
             } catch (err) {
                 loader.classList.remove('active');
                 stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
                 stats.classList.add('active');
             }
             btn.disabled = false;
+        }
+
+        function downloadPivot() {
+            if (pivotDownloadId) window.location.href = `/api/download/${pivotDownloadId}`;
         }
 
         // ── Step 3: Screenshot Report ──
