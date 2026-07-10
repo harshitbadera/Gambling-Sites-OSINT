@@ -634,9 +634,7 @@ def analyze_single_domain(domain: str) -> dict:
         if matches:
             for m in matches[:3]:  # Cap at 3 per type
                 val = m if isinstance(m, str) else str(m)
-                # Truncate long values for safety
-                display_val = val[:30] + "..." if len(val) > 30 else val
-                creds_found.append(f"{cred_type}: {display_val}")
+                creds_found.append(f"{cred_type}: {val}")
 
     result["hardcoded_credentials"] = "; ".join(creds_found) if creds_found else "None"
     result["credential_count"] = len(creds_found)
