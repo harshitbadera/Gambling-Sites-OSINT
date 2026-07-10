@@ -54,8 +54,14 @@
 
         .steps {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            grid-template-columns: 1fr 1fr;
             gap: 1.5rem;
+        }
+
+        @media (max-width: 900px) {
+            .steps {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* ── Cards ────────────────────────────────────── */
@@ -93,6 +99,10 @@
 
         .step-badge.step3 {
             background: linear-gradient(135deg, #a855f7, #7c3aed);
+        }
+
+        .step-badge.step4 {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
         }
 
         .card-header h2 {
@@ -483,12 +493,49 @@
                     Download Word Report (.docx)
                 </button>
             </div>
-        </div>
+
+            <!-- ═══════════ STEP 4 ═══════════ -->
+            <div class="card">
+                <div class="card-header">
+                    <div class="step-badge step4">STEP 4</div>
+                    <h2>Content Analysis</h2>
+                </div>
+                <p class="card-desc">
+                    Upload a list of domains. The system fetches each site and extracts
+                    <strong>HTTP title, body keywords, body size</strong>, and scans for
+                    <strong>hardcoded credentials</strong> (API keys, passwords, tokens).
+                </p>
+
+                <div class="upload-zone" id="zone4">
+                    <input type="file" id="file4" accept=".csv,.xlsx,.xls,.txt">
+                    <div class="upload-icon">&#128274;</div>
+                    <div class="upload-text">Drop domains list here or <strong>click to browse</strong></div>
+                    <div class="file-name" id="fname4"></div>
+                </div>
+
+                <button class="btn" id="btn4" disabled onclick="runContentAnalysis()"
+                    style="background:linear-gradient(135deg,#f59e0b,#d97706); color:#111; margin-top:1rem;">
+                    Run Content Analysis
+                </button>
+
+                <div class="loader" id="loader4">
+                    <div class="spinner" style="border-top-color: #f59e0b;"></div>
+                    <div class="loader-text">Fetching &amp; analyzing website content... ~2–5 min</div>
+                </div>
+
+                <div class="stats" id="stats4"></div>
+
+                <div class="results-wrap" id="results4"></div>
+
+                <button class="btn btn-download" id="dl4" onclick="downloadFile(4)">
+                    Download Content Analysis CSV
+                </button>
+            </div>
     </div>
 
     <script>
         // ── State ──
-        let downloadIds = { 1: null, 2: null };
+        let downloadIds = { 1: null, 2: null, 4: null };
         let reportDownloadFilename = null;
 
         // ── File select handlers ──
@@ -507,9 +554,14 @@
             document.getElementById('fname3').textContent = name;
             document.getElementById('btn3').disabled = !name;
         });
+        document.getElementById('file4').addEventListener('change', function () {
+            const name = this.files[0]?.name || '';
+            document.getElementById('fname4').textContent = name;
+            document.getElementById('btn4').disabled = !name;
+        });
 
         // ── Drag & drop ──
-        ['zone1', 'zone2', 'zone3'].forEach(id => {
+        ['zone1', 'zone2', 'zone3', 'zone4'].forEach(id => {
             const zone = document.getElementById(id);
             zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
             zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
@@ -741,6 +793,84 @@
                 `;
                 stats.classList.add('active');
                 dl.style.display = 'block';
+            } catch (err) {
+                loader.classList.remove('active');
+                stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;
+                stats.classList.add('active');
+            }
+            btn.disabled = false;
+        }
+
+        // ── Step 4: Content Analysis ──
+        async function runContentAnalysis() {
+            const file = document.getElementById('file4').files[0];
+            if (!file) return;
+
+            const btn = document.getElementById('btn4');
+            const loader = document.getElementById('loader4');
+            const stats = document.getElementById('stats4');
+            const results = document.getElementById('results4');
+            const dl = document.getElementById('dl4');
+
+            btn.disabled = true;
+            loader.classList.add('active');
+            stats.classList.remove('active');
+            results.classList.remove('active');
+            dl.style.display = 'none';
+
+            const form = new FormData();
+            form.append('file', file);
+
+            try {
+                const resp = await fetch('/api/content_analysis', { method: 'POST', body: form });
+                const data = await resp.json();
+
+                loader.classList.remove('active');
+
+                if (data.error) {
+                    stats.innerHTML = `<span style="color:#ef4444;">Error:</span> ${data.error}`;
+                    stats.classList.add('active');
+                    btn.disabled = false;
+                    return;
+                }
+
+                downloadIds[4] = data.download_id;
+
+                stats.innerHTML = `
+                    Domains analyzed: <span>${data.total_domains}</span> &nbsp;|&nbsp;
+                    Live sites: <span>${data.live_domains}</span> &nbsp;|&nbsp;
+                    <strong style="color:#ef4444;">Sites with exposed credentials: <span>${data.domains_with_creds}</span></strong> &nbsp;|&nbsp;
+                    Time: <span>${data.elapsed_seconds}s</span>
+                `;
+                stats.classList.add('active');
+
+                if (data.results && data.results.length > 0) {
+                    let html = `<table><thead><tr>
+                        <th>#</th><th>Domain</th><th>Live</th><th>Status</th>
+                        <th>HTTP Title</th><th>Size</th>
+                        <th>Gambling KW</th><th>India KW</th><th>Payment KW</th>
+                        <th>Credentials</th>
+                    </tr></thead><tbody>`;
+                    data.results.forEach((r, i) => {
+                        const credStyle = r.credential_count > 0 ? 'color:#ef4444; font-weight:600;' : '';
+                        html += `<tr>
+                            <td>${i + 1}</td>
+                            <td>${r.domain}</td>
+                            <td style="color:${r.is_live === 'Yes' ? '#10b981' : '#ef4444'}">${r.is_live}</td>
+                            <td>${r.http_status || '-'}</td>
+                            <td>${r.http_title || '-'}</td>
+                            <td>${r.body_size_kb || '-'}</td>
+                            <td>${r.gambling_keywords_found || '-'}</td>
+                            <td>${r.india_keywords_found || '-'}</td>
+                            <td>${r.payment_keywords_found || '-'}</td>
+                            <td style="${credStyle}">${r.hardcoded_credentials || '-'}</td>
+                        </tr>`;
+                    });
+                    html += '</tbody></table>';
+                    results.innerHTML = html;
+                    results.classList.add('active');
+                    dl.style.display = 'block';
+                }
             } catch (err) {
                 loader.classList.remove('active');
                 stats.innerHTML = `<span style="color:#ef4444;">Network error:</span> ${err.message}`;

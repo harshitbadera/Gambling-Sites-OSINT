@@ -13,6 +13,7 @@ Open: http://localhost:5000
 
 import os
 import io
+import re
 import csv
 import time
 import uuid
@@ -494,6 +495,215 @@ def api_lookup():
     })
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# STEP 4: CONTENT ANALYSIS (HTTP Title, Body, Body Size, Hard-coded Creds)
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Regex patterns for detecting hardcoded credentials in HTML source
+CREDENTIAL_PATTERNS = [
+    # API keys
+    (r'(?:api[_-]?key|apikey|api_secret)\s*[:=]\s*["\']([a-zA-Z0-9_\-]{16,})["\']', 'API Key'),
+    (r'(?:sk_live|pk_live|sk_test|pk_test)_[a-zA-Z0-9]{20,}', 'Stripe Key'),
+    (r'AIzaSy[a-zA-Z0-9_\-]{33}', 'Google API Key'),
+    # AWS keys
+    (r'AKIA[0-9A-Z]{16}', 'AWS Access Key'),
+    # Generic secrets
+    (r'(?:secret|password|passwd|pwd)\s*[:=]\s*["\']([^"\' ]{6,})["\']', 'Password/Secret'),
+    (r'(?:token|auth_token|access_token)\s*[:=]\s*["\']([a-zA-Z0-9_\-\.]{16,})["\']', 'Auth Token'),
+    # Database connection strings
+    (r'(?:mongodb|mysql|postgres|redis)://[^\s"\'>]+', 'Database URL'),
+    # Bearer tokens in JS
+    (r'Bearer\s+[a-zA-Z0-9_\-\.]{20,}', 'Bearer Token'),
+]
+
+# Keywords to extract from body content
+BODY_GAMBLING_KEYWORDS = [
+    "bet", "betting", "casino", "poker", "slot", "slots", "rummy",
+    "satta", "matka", "teenpatti", "teen patti", "jackpot", "lottery",
+    "sportsbook", "live casino", "live dealer", "blackjack", "roulette",
+    "baccarat", "wager", "odds", "bookmaker",
+]
+
+BODY_INDIA_KEYWORDS = [
+    "india", "indian", "inr", "₹", "rupee", "paytm", "phonepe",
+    "google pay", "gpay", "upi", "imps", "neft", "net banking",
+    "ipl", "cricket", "kabaddi", "hindi",
+]
+
+BODY_PAYMENT_KEYWORDS = [
+    "upi", "paytm", "phonepe", "google pay", "gpay", "visa",
+    "mastercard", "bitcoin", "btc", "usdt", "crypto", "skrill",
+    "neteller", "bank transfer", "deposit", "withdraw", "payout",
+]
+
+
+def analyze_single_domain(domain: str) -> dict:
+    """
+    Fetch a domain's homepage and extract:
+    - HTTP Title
+    - Body keywords (gambling, India-focus, payment methods)
+    - Body size in bytes
+    - Hardcoded credentials found in source
+    """
+    result = {
+        "domain": domain,
+        "http_status": "",
+        "http_title": "",
+        "body_size_bytes": 0,
+        "body_size_kb": "",
+        "gambling_keywords_found": "",
+        "india_keywords_found": "",
+        "payment_keywords_found": "",
+        "hardcoded_credentials": "",
+        "credential_count": 0,
+        "is_live": "No",
+    }
+
+    # Try HTTPS then HTTP
+    urls = [f"https://{domain}", f"http://{domain}"]
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        )
+    }
+
+    body_text = ""
+    for url in urls:
+        try:
+            resp = http_requests.get(
+                url, headers=headers, timeout=12,
+                verify=False, allow_redirects=True
+            )
+            result["http_status"] = str(resp.status_code)
+
+            if resp.status_code < 400 or resp.status_code in [401, 403]:
+                result["is_live"] = "Yes"
+                body_text = resp.text
+                result["body_size_bytes"] = len(resp.content)
+                result["body_size_kb"] = f"{len(resp.content) / 1024:.1f} KB"
+
+                # Extract title
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(body_text, "html.parser")
+                    title_tag = soup.find("title")
+                    if title_tag and title_tag.string:
+                        result["http_title"] = title_tag.string.strip()[:200]
+                except Exception:
+                    # Fallback: regex
+                    title_match = re.search(
+                        r'<title[^>]*>([^<]+)</title>',
+                        body_text, re.IGNORECASE
+                    )
+                    if title_match:
+                        result["http_title"] = title_match.group(1).strip()[:200]
+
+                break  # Success, stop trying URLs
+        except Exception:
+            continue
+
+    if not body_text:
+        return result
+
+    body_lower = body_text.lower()
+
+    # Gambling keywords in body
+    found_gambling = [
+        kw for kw in BODY_GAMBLING_KEYWORDS if kw in body_lower
+    ]
+    result["gambling_keywords_found"] = "; ".join(found_gambling) if found_gambling else "None"
+
+    # India keywords
+    found_india = [
+        kw for kw in BODY_INDIA_KEYWORDS if kw in body_lower
+    ]
+    result["india_keywords_found"] = "; ".join(found_india) if found_india else "None"
+
+    # Payment keywords
+    found_payment = [
+        kw for kw in BODY_PAYMENT_KEYWORDS if kw in body_lower
+    ]
+    result["payment_keywords_found"] = "; ".join(found_payment) if found_payment else "None"
+
+    # Hardcoded credentials scan
+    creds_found = []
+    for pattern, cred_type in CREDENTIAL_PATTERNS:
+        matches = re.findall(pattern, body_text, re.IGNORECASE)
+        if matches:
+            for m in matches[:3]:  # Cap at 3 per type
+                val = m if isinstance(m, str) else str(m)
+                # Truncate long values for safety
+                display_val = val[:30] + "..." if len(val) > 30 else val
+                creds_found.append(f"{cred_type}: {display_val}")
+
+    result["hardcoded_credentials"] = "; ".join(creds_found) if creds_found else "None"
+    result["credential_count"] = len(creds_found)
+
+    return result
+
+
+@app.route("/api/content_analysis", methods=["POST"])
+def api_content_analysis():
+    """Step 4: Upload domains → HTTP content analysis (title, body, size, creds)."""
+    if "file" not in request.files:
+        return jsonify({"error": "No file uploaded"}), 400
+
+    uploaded = request.files["file"]
+    if not uploaded.filename:
+        return jsonify({"error": "Empty filename"}), 400
+
+    start = time.time()
+
+    # 1. Read domains
+    domains = read_domains_from_upload(uploaded)
+    if not domains:
+        return jsonify({"error": "No valid domains found in file"}), 400
+
+    # 2. Analyze each domain (threaded, 8 workers to avoid overwhelming)
+    results = []
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        futures = {
+            executor.submit(analyze_single_domain, d): d
+            for d in sorted(domains)
+        }
+        for future in as_completed(futures):
+            results.append(future.result())
+
+    results.sort(key=lambda x: x["domain"])
+    elapsed = round(time.time() - start, 1)
+
+    # 3. Count stats
+    live_count = sum(1 for r in results if r["is_live"] == "Yes")
+    creds_count = sum(1 for r in results if r["credential_count"] > 0)
+
+    # 4. Save CSV
+    csv_id = uuid.uuid4().hex[:8]
+    csv_path = os.path.join(TEMP_DIR, f"content_{csv_id}.csv")
+    fieldnames = [
+        "domain", "is_live", "http_status", "http_title",
+        "body_size_bytes", "body_size_kb",
+        "gambling_keywords_found", "india_keywords_found",
+        "payment_keywords_found",
+        "hardcoded_credentials", "credential_count",
+    ]
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(results)
+
+    return jsonify({
+        "success": True,
+        "total_domains": len(domains),
+        "live_domains": live_count,
+        "domains_with_creds": creds_count,
+        "elapsed_seconds": elapsed,
+        "download_id": csv_id,
+        "results": results,
+    })
+
+
 @app.route("/api/screenshot_report", methods=["POST"])
 def api_screenshot_report():
     """Step 3: Upload domains CSV/Excel/TXT → test liveness & capture screenshots → output Word document."""
@@ -555,7 +765,7 @@ def api_download_report(filename):
 def api_download(download_id):
     """Download a generated CSV file."""
     # Check all prefixes
-    for prefix in ["expanded_", "lookup_", "pivot_"]:
+    for prefix in ["expanded_", "lookup_", "pivot_", "content_"]:
         path = os.path.join(TEMP_DIR, f"{prefix}{download_id}.csv")
         if os.path.exists(path):
             return send_file(
