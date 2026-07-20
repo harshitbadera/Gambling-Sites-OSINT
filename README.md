@@ -1,117 +1,101 @@
 # 🎰 Gambling OSINT — Cyber Threat Intelligence Automation Platform
 
-An end-to-end OSINT automation pipeline for discovering, classifying, enriching, and reporting on online gambling websites targeting Indian users.
+An end-to-end OSINT automation platform for discovering, analyzing, and reporting on online gambling websites targeting Indian users. Features a **web-based dashboard** with 4 analysis steps.
 
 ---
 
 ## 📋 Table of Contents
 
 - [Overview](#overview)
-- [Architecture](#architecture)
-- [Pipeline Stages](#pipeline-stages)
+- [Web Dashboard](#web-dashboard)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Usage](#usage)
 - [Configuration](#configuration)
-- [Extending the System](#extending-the-system)
 - [Output Files](#output-files)
+- [Tech Stack](#tech-stack)
 
 ---
 
 ## Overview
 
-This platform automates the intelligence collection and analysis workflow for identifying and profiling online gambling operations, particularly those targeting Indian users. It combines domain discovery, web content analysis, DNS/infrastructure enrichment, and infrastructure correlation into a single, modular pipeline.
+This platform automates the intelligence collection and analysis workflow for identifying and profiling online gambling operations, particularly those targeting Indian users. It combines domain discovery, infrastructure analysis, content scanning, and threat reporting into a single web-based dashboard.
 
 ### Key Capabilities
 
-- **Multi-source domain discovery** with plugin architecture
-- **Automated web content classification** using weighted scoring
-- **Comprehensive infrastructure analysis** (DNS, WHOIS, ASN, hosting)
-- **Infrastructure correlation** to identify related domain networks
-- **Professional Excel reporting** with color-coded sheets and statistics
+- **Fast domain discovery** — generates domain variations from seed lists and validates via parallel DNS (50 threads, ~100–200 new domains in 60 seconds)
+- **Infrastructure enrichment** — DNS lookups (A, AAAA), RDAP/IPWhois for ASN, hosting provider, country
+- **Reverse IP pivoting** — automatically discovers new gambling domains sharing the same non-CDN hosting servers
+- **Content analysis** — extracts HTTP titles, body keywords, body size, and scans for hardcoded credentials (API keys, tokens, passwords)
+- **Liveness & screenshot reporting** — headless browser verification with automated Word document (.docx) report generation
 
 ---
 
-## Architecture
+## Web Dashboard
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    PIPELINE ORCHESTRATOR                     │
-│                      (pipeline.py)                          │
-├──────────┬──────────┬──────────┬──────────┬─────────────────┤
-│ Stage 1  │ Stage 2  │ Stage 3  │ Stage 4  │    Reporting    │
-│Discovery │Classify  │ Enrich   │Correlate │   Generator     │
-│          │          │          │          │                 │
-│ Excel    │ HTTP     │ DNS A/   │ Hosting  │ Multi-sheet     │
-│ Manual   │ Fetch    │ AAAA/NS/ │ ASN      │ Excel with      │
-│ CSV      │ BS4      │ MX/TXT   │ Country  │ charts &        │
-│ Keyword  │ Parse    │ SOA      │ Namesvr  │ statistics      │
-│ CT Logs* │ Score    │ RDAP/    │ IP       │                 │
-│ Search*  │ Classify │ IPWhois  │ CIDR     │                 │
-├──────────┴──────────┴──────────┴──────────┴─────────────────┤
-│                 config.py  │  utils.py                      │
-│            (Configuration) │ (Shared Utilities)             │
-└─────────────────────────────────────────────────────────────┘
-                        * = stub/future
-```
+The primary interface is a **Flask-based web dashboard** (`app.py`) with 4 steps arranged in a 2×2 grid layout.
 
----
+### Step 1 — Find New Gambling Domains
 
-## Pipeline Stages
+Upload a CSV/Excel/TXT file containing known gambling sites. The system:
 
-### Stage 1 — Domain Discovery (`discover.py`)
+1. Reads seed domains from the uploaded file (smart column detection — works with any header)
+2. Generates thousands of domain variations using gambling brand patterns, prefixes, suffixes, and TLD combinations
+3. Validates all candidates via **parallel DNS resolution** (50 concurrent threads using Google & Cloudflare DNS)
+4. Deduplicates to **main domains only** (e.g., `betway.com`, `betway.in`, `betway.net` → keeps `betway.com`)
+5. Filters out IP-like domains (e.g., `154.198.173.1.co`)
 
-Collects candidate gambling-related domains from multiple sources:
+**Output**: CSV of new unique main domains with IP addresses
 
-| Source | Status | Description |
-|--------|--------|-------------|
-| Excel Import | ✅ Active | Imports from existing investigation spreadsheet |
-| Manual List | ✅ Active | Plain-text file, one domain per line |
-| CSV Import | ✅ Active | Auto-detects domain column in CSV files |
-| Keyword Generation | ✅ Active | Generates candidates from keyword × TLD combinations |
-| Certificate Transparency | 🔲 Stub | Ready for crt.sh API integration |
-| Search Engine | 🔲 Stub | Ready for search API integration |
+### Step 2 — Infrastructure Lookup + Reverse IP Pivot
 
-All domains are normalized, validated, deduplicated, and stored with their discovery source.
+Upload the domains CSV from Step 1 (or any domain list). The system:
 
-### Stage 2 — Classification & Scoring (`classify.py`)
+1. Runs bulk infrastructure lookups for each domain:
+   - IPv4 & IPv6 addresses
+   - Hosting provider
+   - ASN number & description
+   - Country
+2. **Automatically pivots** on non-CDN IPs to discover new gambling domains:
+   - Skips major CDN/cloud ASNs (Cloudflare, AWS, Google, Azure, Akamai, Fastly, Meta)
+   - Queries remaining dedicated IPs via HackerTarget reverse IP API
+   - Filters results for gambling-related keywords
+   - Returns newly discovered domains with hosting server info
 
-For each domain, the system:
-1. Fetches the live website (HTTPS → HTTP fallback)
-2. Extracts title, meta tags, visible text
-3. Scores **gambling relevance** (30+ keyword indicators)
-4. Scores **India targeting** (payment methods, sports, language, currency, TLD)
-5. Assigns classification categories with confidence scores
+**Output**: Two CSVs — infrastructure data + newly discovered domains from reverse IP
 
-**Classification Categories:**
-- `Gambling-Related` / `Possibly Gambling-Related` / `Not Gambling-Related`
-- `India-Focused` / `Possibly India-Focused`
+### Step 3 — Liveness & Screenshot Report
 
-### Stage 3 — Infrastructure Enrichment (`enrich.py`)
+Upload a domain list. The system:
 
-Extends the original `main2.py` script into a batch-processing engine:
+1. Visits each domain using a headless Chromium browser (Playwright)
+2. Checks if the site is live/working
+3. Captures a full-page screenshot of each active site
+4. Compiles a professionally formatted **Word document (.docx)** with screenshots, domain info, and liveness status
+5. Auto-installs Playwright browser binaries if missing
 
-| Record Type | Description |
-|-------------|-------------|
-| A (IPv4) | IPv4 addresses |
-| AAAA (IPv6) | IPv6 addresses |
-| NS | Nameservers |
-| MX | Mail exchange servers |
-| TXT | TXT records (SPF, DKIM, etc.) |
-| SOA | Start of Authority |
-| RDAP/IPWhois | ASN, hosting provider, country, network CIDR |
+**Output**: Downloadable .docx report with screenshots
 
-Features rate limiting, graceful error handling, and skip-if-already-processed logic.
+### Step 4 — Content Analysis
 
-### Stage 4 — Intelligence Correlation (`correlate.py`)
+Upload a domain list. The system:
 
-Identifies relationships between domains by clustering on shared:
-- Hosting providers
-- ASN numbers
-- Nameservers
-- IP addresses
-- Countries
-- Network CIDR ranges
+1. Fetches each website's homepage (HTTPS → HTTP fallback, with browser-like User-Agent)
+2. Extracts the **HTTP Title** from the `<title>` tag using BeautifulSoup
+3. Measures **Body Size** in bytes/KB (indicator of site legitimacy — parked domains are < 5KB)
+4. Scans the HTML body for **3 keyword categories**:
+   - **Gambling keywords** (22): bet, casino, poker, slot, rummy, satta, matka, etc.
+   - **India-targeting keywords** (17): india, ₹, UPI, Paytm, PhonePe, IPL, cricket, etc.
+   - **Payment method keywords** (17): UPI, Paytm, Bitcoin, Visa, Mastercard, etc.
+5. Scans for **hardcoded credentials** using 8 regex patterns:
+   - Google API Keys (`AIzaSy...`)
+   - AWS Access Keys (`AKIA...`)
+   - Stripe Keys (`sk_live_`, `pk_live_`)
+   - Generic API keys, passwords, auth tokens
+   - Database connection strings (MongoDB, MySQL, PostgreSQL, Redis)
+   - Bearer tokens
+
+**Output**: CSV with domain, liveness status, HTTP title, body size, keyword matches, and exposed credentials
 
 ---
 
@@ -119,28 +103,21 @@ Identifies relationships between domains by clustering on shared:
 
 ```
 gambling_osint/
-├── main2.py                  # Original infrastructure lookup script (preserved)
-├── pipeline.py               # Main pipeline orchestrator (entry point)
+├── app.py                    # Flask web dashboard (main entry point)
+├── templates/
+│   └── index.html            # Dashboard frontend (dark-themed, 2×2 grid)
+├── quick_expand.py           # Fast domain expansion engine (50-thread DNS)
+├── screenshot_manager.py     # Playwright screenshot & .docx report generator
 ├── config.py                 # Central configuration (all settings)
-├── utils.py                  # Shared utilities (domain normalization, I/O)
-├── discover.py               # Stage 1: Domain discovery engine
-├── classify.py               # Stage 2: Classification & scoring
-├── enrich.py                 # Stage 3: Infrastructure enrichment
-├── correlate.py              # Stage 4: Intelligence correlation
-├── report_generator.py       # Excel report generator
+├── utils.py                  # Shared utilities (domain validation, I/O)
+├── main2.py                  # Original infrastructure lookup script (preserved)
 ├── requirements.txt          # Python dependencies
-├── README.md                 # This file
+├── .gitignore                # Git ignore rules
 ├── sites betting updated list (1).xlsx  # Original investigation data
-├── data/
-│   └── manual_domains.txt    # Manual domain input file
-├── output/                   # Pipeline outputs (auto-created)
-│   ├── discovered_domains.csv
-│   ├── classified_domains.csv
-│   ├── enriched_domains.csv
-│   ├── correlation_clusters.csv
-│   └── gambling_osint_report_YYYYMMDD_HHMMSS.xlsx
+├── output/                   # All outputs (auto-created)
+│   ├── temp/                 # Temporary download files from web interface
+│   └── screenshots/          # Captured screenshots
 └── logs/                     # Execution logs (auto-created)
-    └── pipeline_YYYYMMDD_HHMMSS.log
 ```
 
 ---
@@ -153,8 +130,9 @@ gambling_osint/
 ### Setup
 
 ```bash
-# 1. Navigate to the project directory
-cd gambling_osint
+# 1. Clone the repository
+git clone https://github.com/harshitbadera/Gambling-Sites-OSINT.git
+cd Gambling-Sites-OSINT
 
 # 2. (Recommended) Create a virtual environment
 python -m venv venv
@@ -164,64 +142,49 @@ venv\Scripts\activate        # Windows
 # 3. Install dependencies
 pip install -r requirements.txt
 
-# 4. Install Playwright browser binaries (required for screenshots/liveness checking)
+# 4. Install Playwright browser binaries (required for Step 3 screenshots)
 playwright install chromium
 ```
+
+> **Note**: Step 4 (Playwright install) is only required if you plan to use Step 3 (Liveness & Screenshot Report). The app will automatically attempt to install Chromium if missing when Step 3 is triggered.
 
 ---
 
 ## Usage
 
-### Run the Full Pipeline
+### Run the Web Dashboard
 
 ```bash
-python pipeline.py
+python app.py
 ```
 
-### Run Individual Stages
+Open **http://localhost:5000** in your browser. The dashboard provides 4 steps:
+
+| Step | Function | Input | Output |
+|------|----------|-------|--------|
+| **Step 1** | Find New Gambling Domains | CSV/Excel with known domains | CSV of new main domains |
+| **Step 2** | Infrastructure Lookup + Reverse IP Pivot | Domain list CSV | Infrastructure CSV + discovered domains CSV |
+| **Step 3** | Liveness & Screenshot Report | Domain list CSV | Word document (.docx) with screenshots |
+| **Step 4** | Content Analysis | Domain list CSV | CSV with titles, keywords, body size, credentials |
+
+### Fast Domain Expansion (Standalone)
 
 ```bash
-# Stage 1 only — Discovery
-python pipeline.py --stage 1
+# Use default Excel as seed
+python quick_expand.py
 
-# Stages 1 and 2 — Discovery + Classification
-python pipeline.py --stage 1 2
+# Use custom input
+python quick_expand.py --input found.csv
+python quick_expand.py --input my_seeds.xlsx
 
-# Stage 3 only — Enrichment (requires discovery/classification CSV)
-python pipeline.py --stage 3
-
-# Stage 4 + Report — Correlation and reporting
-python pipeline.py --stage 4
+# Adjust thread count
+python quick_expand.py --workers 80
 ```
 
-### Re-generate Report
+### Original Infrastructure Lookup (Standalone)
 
 ```bash
-# Generate report from existing CSV outputs (no re-processing)
-python pipeline.py --report-only
-```
-
-### Include Keyword Domain Generation
-
-```bash
-# WARNING: Generates thousands of candidate domains
-python pipeline.py --keywords
-```
-
-### Interactive Domain Lookup (like original main2.py)
-
-```bash
-python enrich.py --interactive
-```
-
-### Run Individual Modules
-
-```bash
-python discover.py       # Run discovery standalone
-python classify.py       # Run classification standalone
-python enrich.py         # Run enrichment standalone
-python correlate.py      # Run correlation standalone
-python report_generator.py  # Generate report standalone
+python main2.py
 ```
 
 ---
@@ -235,89 +198,49 @@ All settings are centralized in `config.py`:
 | `GAMBLING_KEYWORDS` | Keywords for domain discovery |
 | `GAMBLING_CONTENT_KEYWORDS` | Keywords for content classification |
 | `INDIA_FOCUS_KEYWORDS` | India-targeting indicators |
-| `SCORING_WEIGHTS` | Weight for each scoring indicator |
-| `CLASSIFICATION_THRESHOLDS` | Score thresholds for categories |
 | `DNS_NAMESERVERS` | DNS resolvers (Google + Cloudflare) |
 | `HTTP_TIMEOUT` | Timeout for website fetching |
 | `ENRICHMENT_DELAY` | Rate limiting between lookups |
-| `CLUSTER_MIN_SIZE` | Minimum domains to form a cluster |
-
-### Adjusting Scoring
-
-Edit `SCORING_WEIGHTS` in `config.py` to change how different indicators affect classification:
-
-```python
-SCORING_WEIGHTS = {
-    "gambling_keyword_match": 2,     # per keyword found
-    "title_contains_gambling": 10,   # gambling term in page title
-    "inr_symbol_found": 10,          # ₹ symbol detected
-    "indian_payment_method": 8,      # UPI/Paytm/PhonePe found
-    # ... etc
-}
-```
-
----
-
-## Extending the System
-
-### Adding a New Discovery Source
-
-1. Create a new class that inherits from `DiscoverySource`
-2. Implement `name` property and `discover()` method
-3. Register it with the engine
-
-```python
-from discover import DiscoverySource
-
-class MyCustomSource(DiscoverySource):
-    @property
-    def name(self) -> str:
-        return "My Custom Source"
-    
-    def discover(self) -> list:
-        # Your discovery logic here
-        domains = [...]
-        return [
-            self._make_record(domain=d, raw_input=d)
-            for d in domains
-        ]
-```
-
-Register in `pipeline.py` or use the `extra_sources` parameter:
-
-```python
-from discover import run_discovery
-results = run_discovery(extra_sources=[MyCustomSource()])
-```
-
-### Adding New Scoring Indicators
-
-1. Add weight in `config.py` → `SCORING_WEIGHTS`
-2. Add detection logic in `classify.py` → `ScoringEngine.score()`
-3. Optionally add new keywords to the keyword lists in `config.py`
 
 ---
 
 ## Output Files
 
-| File | Description |
-|------|-------------|
-| `output/discovered_domains.csv` | All unique discovered domains with sources |
-| `output/classified_domains.csv` | Classification scores and categories |
-| `output/enriched_domains.csv` | Full infrastructure data per domain |
-| `output/correlation_clusters.csv` | Infrastructure cluster memberships |
-| `output/gambling_osint_report_*.xlsx` | Final Excel report (5 sheets) |
-| `logs/pipeline_*.log` | Detailed execution log |
+| File | Step | Description |
+|------|------|-------------|
+| `expanded_*.csv` | Step 1 | New domains discovered via pattern expansion |
+| `lookup_*.csv` | Step 2 | Infrastructure lookup results (IPs, ASN, hosting) |
+| `pivot_*.csv` | Step 2 | Domains discovered via reverse IP pivoting |
+| `liveness_report_*.docx` | Step 3 | Screenshot & liveness report |
+| `content_*.csv` | Step 4 | Content analysis (titles, keywords, credentials) |
+
+---
+
+## Tech Stack
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | Python 3.9+, Flask |
+| Frontend | HTML, CSS, JavaScript (vanilla) |
+| DNS Resolution | dnspython |
+| IP/ASN Lookup | ipwhois (RDAP) |
+| Domain Parsing | tldextract |
+| HTTP Fetching | requests |
+| HTML Parsing | BeautifulSoup4 |
+| Browser Automation | Playwright (Chromium) |
+| Report Generation | python-docx, openpyxl |
 
 ---
 
 ## Notes
 
 - The original `main2.py` script is **preserved unchanged**
-- The `enrich.py --interactive` flag replicates the original interactive experience
 - SSL certificate warnings are suppressed for gambling sites (many use self-signed certs)
 - Rate limiting is built-in to avoid IP blocking during bulk processing
-- All processing stages are **idempotent** — re-running skips already-processed domains
+- The reverse IP pivot skips CDN providers (Cloudflare, AWS, Google, etc.) — only queries dedicated hosting IPs
+- HackerTarget reverse IP API has a free limit of 100 queries/day
+- Step 3 auto-installs Playwright Chromium browser binaries if missing
+- All domain validation filters out IP-like domains (e.g., `154.198.173.1.co`)
 
 ---
 
